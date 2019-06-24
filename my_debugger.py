@@ -11,13 +11,15 @@ class debugger():
         self.debugger_active = False
         self.h_thread = None
         self.context = None
+        self.exception = None
+        self.exception_address = None
 
     def open_thread(self, thread_id):
         h_thread = kernel32.OpenThread(THREAD_ALL_ACCESS, None, thread_id)
         if h_thread is not None:
             return h_thread
         else:
-            print("[g] Could not obtain a valid thread handle.")
+            print("[*] Could not obtain a valid thread handle.")
 
     def enumerate_threads(self):
         thread_entry = THREADENTRY32()
@@ -88,11 +90,31 @@ class debugger():
 
         if kernel32.WaitForDebugEvent(byref(debug_event), INFINITE):
             # Obtain the thread and context information
-            self.h_thread = self.open_tthread(debug_event.dw_ThreadId)
+            self.h_thread = self.open_thread(debug_event.dw_ThreadId)
             self.context = self.get_thread_context(self.h_thread)
-            print("Event Code: %d Thread ID: %d") % (debug_event.dwDebugEventCode, debug_event.dwThreadId)
+            print("Event Code: %d Thread ID: %d".format(debug_event.dwDebugEventCode, debug_event.dwThreadId))
+            # if event is an exception, examine further
+            if debug_event.dwDebugEventCode == EXCEPTION_DEBUG_EVENT:
+                # obtain the exception code
+                exception = debug_event.u.Exception.ExceptionRecord.ExceptionCode
+                self.exception_address =h debug_tevent.u.Exception.ExceptionRecord.ExceptionAddress
+
+            if exception == EXCEPTION_ACCESS_VIOLATION:
+                print("Access Violation Detected.")
+                # if a breakpoint is detected, call an internal handler
+            elif exception == EXCEPTION_BREAKPOINT:
+                continue_status = self.exception_handler_breakpoint()
+            elif ec == EXCEPTION_GUARD_PAGE:
+                print("Guard Page Access Detected.")
+            elif ec == EXCEPTION_SINGLE_STEP:
+                print("Single Stepping")
+
             kernel32.ContinueDebugEvent(
                     debug_event.dwProcessId,
                     debug_event.dwThreadId,
                     continue_status)
-
+    
+    def exception_handler_breakpoint():
+        print("[*] Inside the breakpoint handler.")
+        print("Exception Address: 0x%08x".format(self.exception_address))
+        return DBG_CONTINUE
