@@ -13,6 +13,7 @@ class debugger():
         self.context = None
         self.exception = None
         self.exception_address = None
+        self.breakpoints = {}
 
     def open_thread(self, thread_id):
         h_thread = kernel32.OpenThread(THREAD_ALL_ACCESS, None, thread_id)
@@ -118,3 +119,58 @@ class debugger():
         print("[*] Inside the breakpoint handler.")
         print("Exception Address: 0x%08x".format(self.exception_address))
         return DBG_CONTINUE
+
+    def read_process_memory(self, address, length):
+        data = ''
+        read_buf = create_string_buffer(length)
+        count = c_ulong(0)
+
+        if not kernel32.ReadProcessMemory(
+                self.h_process,
+                address,
+                read_buf,
+                length,
+                byref(count)):
+            return False
+        else:
+            data += read_buf.raw
+            return data
+
+    def write_process_memory(self, address data):
+        count = c_ulong(0)
+        length = len(data)
+
+        c_data = c_char_p_(data[count.value:])
+
+        if not kernel32.WriteProcessMemory(
+                self.h_process,
+                address,
+                c_data,
+                length,
+                byref(count)):
+            return False
+        else:
+            return True
+
+    def bp_set(self, address):
+        if not self.breakpoints.has_key(address):
+            try:
+                # store the origina byte
+                original_byte = self.read_process_memory(address, 1)
+
+                # write the INT3 opcode
+                self.write_process_memory(address, "\xCC")
+
+                #register the breakpoint in our internal list
+                self.breakpoints[address]=h (address, original_byte)
+            except:
+                return False
+        return True
+
+    def func_resolve(self, dll, function):
+        handle = kernel32.GetModyleHandle(dll)
+        address = kernel32.GetProcAddress(handle, function)
+
+        kernel32.CloseHandle(handle)
+
+        return address

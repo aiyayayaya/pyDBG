@@ -18,5 +18,9 @@ for thread in listing:
     print("[] ECX: 0x%08x" % thread_context.Ecx)
     print("[] EDX: 0x%08x" % thread_context.Edx)
     print("[] END DUMP")
+
+printf_address = debugger.func_resolve("mscvrt.dll", "printf")
+print("[*] Address of printf: 0x%08c".format(printf_address))
+debugger.bp_set(printf_address)
 debugger.run()
 debugger.detach()
