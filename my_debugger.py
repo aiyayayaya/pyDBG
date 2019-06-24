@@ -6,7 +6,11 @@ kernal32 = windll.kernel32
 
 class debugger():
     def __init__(self):
-        pass
+        self.h_process = None
+        self.pid = None
+        self.debugger_active = False
+        self.h_thread = None
+        self.context = None
 
     def open_thread(self, thread_id):
         h_thread = kernel32.OpenThread(THREAD_ALL_ACCESS, None, thread_id)
@@ -77,4 +81,18 @@ class debugger():
             print("[*] PID: %d" % process_information.dwProcessId)
         else:
             print("[*] Error: 0x%08x." % kernel32.GetLastError())
+
+    def get_debug_event(self):
+        debug_event = DEBUG_EVENT()
+        continue_status = DBG_CONTINUE
+
+        if kernel32.WaitForDebugEvent(byref(debug_event), INFINITE):
+            # Obtain the thread and context information
+            self.h_thread = self.open_tthread(debug_event.dw_ThreadId)
+            self.context = self.get_thread_context(self.h_thread)
+            print("Event Code: %d Thread ID: %d") % (debug_event.dwDebugEventCode, debug_event.dwThreadId)
+            kernel32.ContinueDebugEvent(
+                    debug_event.dwProcessId,
+                    debug_event.dwThreadId,
+                    continue_status)
 

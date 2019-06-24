@@ -18,5 +18,5 @@ for thread in listing:
     print("[] ECX: 0x%08x" % thread_context.Ecx)
     print("[] EDX: 0x%08x" % thread_context.Edx)
     print("[] END DUMP")
-
+debugger.run()
 debugger.detach()
