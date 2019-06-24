@@ -1,4 +1,5 @@
 import my_debugger
+from my_debugger_define import *
 
 debugger = my_debugger.debugger()
 pid = input("Enter the PID of the process to attach to: ")
@@ -21,6 +22,7 @@ for thread in listing:
 
 printf_address = debugger.func_resolve("mscvrt.dll", "printf")
 print("[*] Address of printf: 0x%08c".format(printf_address))
+debugger.bp_set_hw(printf_address, 1, HW_EXECUTE)
 debugger.bp_set(printf_address)
 debugger.run()
 debugger.detach()
