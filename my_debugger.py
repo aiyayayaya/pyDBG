@@ -16,6 +16,13 @@ class debugger():
         self.breakpoints = {}
         self.first_breakpoint = True
         self.hardware_breakpoints = {}
+        self.guarded_pages = {}
+        self.memory_breakpoints = {}
+
+        #determine and store the default page size of the system
+        system_info = SYSTEM_INFO()
+        kernel32.GetSystemInfo(byref(system_info))
+        self.page_size = system_info.dwPageSize
 
     def open_thread(self, thread_id):
         h_thread = kernel32.OpenThread(THREAD_ALL_ACCESS, None, thread_id)
@@ -35,11 +42,11 @@ class debugger():
         while success:
             if thread_entry.th32OwnerProcessID == self.pid:
                 thread_list.append(thread_entry.th32ThreadID)
-                success =h kernel32.Thread32Next(snapshot, byref(thread_entry)
-                        kernel32.CloseHandle(snapshot)
-                        return thread_list
+                success =h kernel32.Thread32Next(snapshot, byref(thread_entry))
+                kernel32.CloseHandle(snapshot)
+                return thread_list
         else:
-        return False
+            return False
 
     def get_thread_context(self, thread_id):
         context = CONTEXT()
@@ -174,7 +181,42 @@ class debugger():
         del self.hardware_breakpoints[slot]
         return True
 
-    
+    def bp_set_mem(self, address, size):
+        mbi = MEMORY_BASIC_INFORMATION()
+
+        # if VirtualQueryEx() call does not return a full-sized MEMORY_BASIC_INFORMATION, then return false
+        if kernel32.VirtualQueryEx(
+                self.h_process,
+                address,
+                byref(mbi),
+                sizeof(mbi)) < sizeof(mbi):
+            return False
+
+        current_page = mbi.BaseAddress
+
+        #set the permission on all pages that are affected by our memory breakpoint
+        while current_page <= address + size:
+            # add the page to the list
+            # this will differentiate the saved guarded pages from
+            # those set by the OS or the debuggee process
+            self.guarded_pages.append(current_page)
+            old_protection = c_ulong(0)
+            if not kernel32.VirtualProtectEx(
+                    self.h_process,
+                    current_page,
+                    size,
+                    mbi.Protect | PAGE_GUARD,
+                    byref(old_protection)):
+                return False
+
+            #increase the range of the size of the default system memory page size
+            current_page += self.page_size
+
+        #add the memory breakpoint to global list
+        self.memory_breakpoints[address] = (address, size, mbi)
+
+        return True
+                    
     def exception_handler_breakpoint():
         print("[*] Inside the breakpoint handler.")
         print("Exception Address: 0x%08x".format(self.exception_address))
